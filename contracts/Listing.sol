@@ -1,10 +1,11 @@
 pragma solidity ^0.4.11;
+import 'zeppelin-solidity/contracts/ownership/Ownable.sol';
 
 /// @title Listing
 /// @dev Used to keep marketplace of listings for buyers and sellers
 /// @author Matt Liu <matt@originprotocol.com>, Josh Fraser <josh@originprotocol.com>, Stan James <stan@originprotocol.com>
 
-contract Listing {
+contract Listing is Ownable {
 
   /*
    * Events
@@ -20,9 +21,6 @@ contract Listing {
   /*
    * Storage
    */
-
-  // Origin owner
-  address public origin;
 
   // Array of all listings
   listingStruct[] public listings;
@@ -67,10 +65,8 @@ contract Listing {
    * Public functions
    */
 
-  // Defines origin admin address - may be removed for public deployment
   function Listing()
   {
-    origin = msg.sender;
   }
 
   /// @dev listingsLength(): Return number of listings
