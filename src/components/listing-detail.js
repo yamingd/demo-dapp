@@ -81,12 +81,18 @@ class ListingsDetail extends Component {
     })
   }
 
-  //format listing creation date and language
+  // Format listing creation date and language
   dateFormat() {
     const date = this.state.timeCreated;
     const newDate = new Date(Date(date));
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    return newDate.toLocaleDateString(`${navigator.language}`, options)
+    const options = { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit'
+    };
+    return newDate.toLocaleDateString(navigator.language, options)
   }
 
   render() {
@@ -129,8 +135,7 @@ class ListingsDetail extends Component {
               <div className="category">{this.state.category}</div>
               <div className="title">{this.state.name}</div>
               <div className="description">{this.state.description}</div>
-              <div className="timeCreated">Created on {this.dateFormat()}</div>
-              <div className="lister"> by {this.state.lister}</div>
+              <div className="details">Created {this.dateFormat()} by {this.state.lister}</div>
               <a href={ipfsService.gatewayUrlForHash(this.state.ipfsHash)} target="_blank">
                 View on IPFS <big>&rsaquo;</big>
               </a>
