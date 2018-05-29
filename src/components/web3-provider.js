@@ -2,7 +2,10 @@ import React, { Component, Fragment } from 'react'
 import { connect } from 'react-redux'
 import { withRouter } from 'react-router'
 
+import QRCode from 'qrcode.react'
 import Modal from './modal'
+import detectMobile from 'utils/detectMobile'
+import clipboard from 'clipboard-polyfill'
 
 import origin from '../services/origin'
 import Store from '../Store'
@@ -50,6 +53,36 @@ const NotWeb3EnabledDesktop = props => (
         className="btn btn-clear">
         Full Instructions
       </a>
+    </div>
+  </Modal>
+)
+
+const LinkerPopUp = props => (
+  <Modal backdrop="static" className="not-web3-enabled linker-popup" isOpen={true}>
+   <a
+      className="close"
+      aria-label="Close"
+      onClick={() => props.cancel()}
+    >
+      <span aria-hidden="true">&times;</span>
+    </a>
+    <div>
+      To {props.web3Intent}, you can link with your Origin Mobile Wallet with this code: {props.linkerCode} <br />
+      {detectMobile() && <button className="btn btn-primary" style={{width:"200px"}} onClick={() => 
+        clipboard.writeText("orgw:"+ props.linkerCode).then( function(){
+          let url = "orgwapp://" + props.linkerCode
+          console.log("Code copied to clipboard successfully... opening url", url)
+          window.open(url)
+        }, function(err){
+          console.log("Error opening url")
+        })                   
+      }>
+        Copy & Open App 
+        </button>
+      }
+      <div style={{padding:'50px', backgroundColor:'white'}}>
+      <QRCode value={"orgw:" + props.linkerCode}/>
+      </div>
     </div>
   </Modal>
 )
@@ -175,11 +208,14 @@ class Web3Provider extends Component {
       networkId: null,
       networkError: null,
       provider: null,
+      linkerCode:"",
+      linkerPopUp:false
     }
   }
 
-  componentWillMount() {
+  async componentWillMount() {
     this.setState({ provider: web3.currentProvider })
+
   }
 
   /**
@@ -191,6 +227,19 @@ class Web3Provider extends Component {
     this.fetchNetwork()
     this.initAccountsPoll()
     this.initNetworkPoll()
+    if (origin.contractService.walletLinker)
+    {
+        origin.contractService.walletLinker.showPopUp = this.showLinkerPopUp.bind(this);
+        origin.contractService.walletLinker.setLinkCode = this.setLinkerCode.bind(this);
+    }
+  }
+
+  showLinkerPopUp(linkerPopUp){
+    this.setState({linkerPopUp})
+  }
+
+  setLinkerCode(linkerCode) {
+    this.setState({linkerCode})
   }
 
   /**
@@ -209,7 +258,7 @@ class Web3Provider extends Component {
    */
   initNetworkPoll() {
     if (!this.networkInterval) {
-      this.networkInterval = setInterval(this.fetchNetwork, ONE_MINUTE)
+      this.networkInterval = setInterval(this.fetchNetwork.bind(this), ONE_MINUTE)
     }
   }
 
@@ -225,6 +274,19 @@ class Web3Provider extends Component {
         this.handleAccounts(accounts)
       }
     })
+
+    if (web3.currentProvider != this.state.provider)
+    {
+      //got a real provider now
+      this.setState({ provider: web3.currentProvider })
+    }
+
+    let code = origin.contractService.getMobileWalletLink()
+    if (this.state.linkerCode != code)
+    {
+      //let's set the linker code
+      this.setState({ linkerCode: code })
+    }
   }
 
   /**
@@ -264,15 +326,18 @@ class Web3Provider extends Component {
     // Delay and condition the use of the network value.
     // https://github.com/MetaMask/metamask-extension/issues/1380#issuecomment-375980850
     if (this.state.networkConnected === null) {
-      setTimeout(() => {
-        !called &&
-          web3 &&
-          web3.version &&
-          (web3.version.network === 'loading' || !web3.version.network) &&
-          this.setState({
-            networkConnected: false
-          })
-      }, 4000)
+      if (!origin.contractService.walletLinker)
+      {
+        setTimeout(() => {
+          !called &&
+            web3 &&
+            web3.version &&
+            (web3.version.network === 'loading' || !web3.version.network) &&
+            this.setState({
+              networkConnected: false
+            })
+        }, 4000)
+      }
     }
   }
 
@@ -284,13 +349,23 @@ class Web3Provider extends Component {
       this.props.storeWeb3Account(curr)
 
       // force reload on account change
-      prev !== null && window.location.reload()
+      if (prev !== null && (!curr) )
+      {
+        window.location.reload()
+      }
+      else
+      {
+        if (prev !== null && confirm("Your account have changed do you wish to reload this page."))
+        {
+           window.location.reload()
+        }
+      }
     }
   }
 
   render() {
     const { onMobile, web3Account, web3Intent, storeWeb3Intent } = this.props
-    const { networkConnected, networkId, provider } = this.state
+    const { networkConnected, networkId, provider, linkerCode, linkerPopUp } = this.state
     const currentNetworkName = networkNames[networkId]
       ? networkNames[networkId]
       : networkId
@@ -299,7 +374,6 @@ class Web3Provider extends Component {
 
     return (
       <Fragment>
-
         { /* provider should always be present */
           !provider &&
           <Web3Unavailable onMobile={onMobile} />
@@ -318,25 +392,28 @@ class Web3Provider extends Component {
           networkNotSupported &&
           <UnsupportedNetwork currentNetworkName={currentNetworkName} onMobile={onMobile} />
         }
-
         { /* attempting to use web3 in unsupported mobile browser */
+          /*
           web3Intent &&
           !web3.givenProvider &&
           onMobile &&
           <NotWeb3EnabledMobile web3Intent={web3Intent} storeWeb3Intent={storeWeb3Intent} />
+          */
         }
+        
 
         { /* attempting to use web3 in unsupported desktop browser */
           web3Intent &&
           !web3.givenProvider &&
-          !onMobile &&
-          <NotWeb3EnabledDesktop web3Intent={web3Intent} storeWeb3Intent={storeWeb3Intent} />
+          linkerCode &&
+          linkerPopUp &&
+          <LinkerPopUp web3Intent={web3Intent} cancel={() => { storeWeb3Intent(null); origin.contractService.walletLinker.cancelLink() }} linkerCode={linkerCode} />
         }
 
         { /* attempting to use web3 without being signed in */
           web3Intent &&
           web3.givenProvider &&
-          web3Account === undefined &&
+          !web3Account &&
           <NoWeb3Account web3Intent={web3Intent} storeWeb3Intent={storeWeb3Intent} />
         }
 
