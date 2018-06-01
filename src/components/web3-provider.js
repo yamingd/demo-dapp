@@ -72,7 +72,7 @@ const LinkerPopUp = props => (
       To {props.web3Intent}, you can link with your Origin Mobile Wallet with this code: {props.linkerCode} <br />
       {detectMobile() && <button className="btn btn-primary" style={{width:"200px"}} onClick={() => 
         clipboard.writeText("orgw:"+ props.linkerCode).then( function(){
-          let url = "orgwapp://" + props.linkerCode
+          let url = "https://www.originprotocol.com/mobile"
           console.log("Code copied to clipboard successfully... opening url", url)
           window.open(url)
         }, function(err){
@@ -83,7 +83,7 @@ const LinkerPopUp = props => (
         </button>
       }
       <div style={{padding:'50px', backgroundColor:'white'}}>
-      <QRCode value={"orgw:" + props.linkerCode}/>
+      <QRCode value={"https://www.originprotocol.com/mobile/" + props.linkerCode}/>
       </div>
     </div>
   </Modal>
@@ -233,6 +233,7 @@ class Web3Provider extends Component {
     {
         origin.contractService.walletLinker.showPopUp = this.showLinkerPopUp.bind(this);
         origin.contractService.walletLinker.setLinkCode = this.setLinkerCode.bind(this);
+        origin.contractService.walletLinker.showNextPage = this.showNextPage.bind(this);
     }
   }
 
@@ -242,6 +243,18 @@ class Web3Provider extends Component {
 
   setLinkerCode(linkerCode) {
     this.setState({linkerCode})
+  }
+
+  showNextPage() {
+    let now = this.props.location.pathname
+    if (now.startsWith("/listing/"))
+    {
+      this.props.history.push("/my-purchases")
+    }
+    else if (now.startsWith("/create"))
+    {
+      this.props.history.push("/my-listings")
+    }
   }
 
   /**
@@ -350,9 +363,28 @@ class Web3Provider extends Component {
     if (curr !== prev) {
       this.props.storeWeb3Account(curr)
 
-      // force reload on account change
-      this.props.fetchProfile()
-      this.props.getBalance()
+      // TODO: fix this with some route magic!
+      if(["/my-listings", "/my-purchases","/my-sales"].includes(this.props.location.pathname))
+      {
+        if (prev !== null && (!curr) )
+        {
+          setTimeout(() =>{ window.location.reload()}, 1000)
+        }
+        else
+        {
+          if (prev !== null)
+          {
+            setTimeout(() =>{ window.location.reload()}, 1000)
+          }
+        }
+      }
+      else
+      {
+        // force reload on account change
+        this.props.fetchProfile()
+        this.props.getBalance()
+      }
+        
     }
   }
 
